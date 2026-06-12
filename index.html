@@ -18,7 +18,7 @@
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl"></script>
 <script src="https://cdn.jsdelivr.net/npm/@tensorflow-models/body-segmentation"></script>
 
-    <link rel="stylesheet" href="css/styles.css">
+<link rel="stylesheet" href="css/styles.css">
 </head>
 <body>
 
@@ -92,10 +92,10 @@
 </div>
 
 <div class="tool-row">
-  <div class="tool-btn" onclick="transformImg('rotL')">↺ Rotate</div>
-  <div class="tool-btn" onclick="transformImg('rotR')">↻ Rotate</div>
-  <div class="tool-btn" onclick="transformImg('flipH')">↔ Flip</div>
-  <div class="tool-btn" onclick="transformImg('flipV')">↕ Flip</div>
+  <div class="tool-btn" onclick="window.transformImg('rotL')">↺ Rotate</div>
+  <div class="tool-btn" onclick="window.transformImg('rotR')">↻ Rotate</div>
+  <div class="tool-btn" onclick="window.transformImg('flipH')">↔ Flip</div>
+  <div class="tool-btn" onclick="window.transformImg('flipV')">↕ Flip</div>
 </div>
 
 <div class="sec">2. Aesthetics & Color</div>
@@ -109,6 +109,7 @@
   <div class="preset-card pt-roadtrip" data-preset="roadtrip"><div class="preset-thumb">HIGHWAY</div></div>
   <div class="preset-card pt-cottage" data-preset="cottage"><div class="preset-thumb">Cottagecore</div></div>
   <div class="preset-card pt-editorial" data-preset="editorial"><div class="preset-thumb">EDITORIAL</div></div>
+  <div class="preset-card pt-magazine active" data-preset="magazine"><div class="preset-thumb">MAGAZINE</div></div>
 </div>
 
 <div style="background: rgba(255,255,255,0.02); border: 1px solid var(--border); padding: 10px; border-radius: 8px; margin-bottom: 15px;">
@@ -310,6 +311,6 @@
 </div>
 </div>
 
-  <script type="module" src="js/app.js"></script>
+<script type="module" src="js/app.js"></script>
 </body>
 </html>

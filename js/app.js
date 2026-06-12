@@ -1,7 +1,9 @@
 // Main app module extracted from inline script in Index.html
 // This file initializes listeners and re-exports functions from smaller modules.
+import { initCanvas, initPointerEvents, resetS } from './processor.js';
 import { initUI } from './ui.js';
-import { initCanvas } from './processor.js';
+
+window.resetS = resetS;
 
 function hideGlobalLoader() {
   const loader = document.getElementById('globalLoader');
@@ -11,5 +13,6 @@ function hideGlobalLoader() {
 document.addEventListener('DOMContentLoaded', () => {
   initCanvas();
   initUI();
+  initPointerEvents();
   hideGlobalLoader();
 });
