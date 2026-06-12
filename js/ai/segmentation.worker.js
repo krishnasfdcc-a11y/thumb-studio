@@ -6,33 +6,63 @@ importScripts(
 );
 
 let segmenter = null;
+let modelReady = false;
 
 // Initialize the model when the worker loads
 async function initModel() {
-    await tf.setBackend('webgl');
-    await tf.ready();
-    segmenter = await bodySegmentation.createSegmenter(
-        bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation, 
-        { runtime: 'tfjs', modelType: 'general' }
-    );
-    postMessage({ status: 'ready' });
+    try {
+        await tf.setBackend('webgl');
+        await tf.ready();
+        segmenter = await bodySegmentation.createSegmenter(
+            bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation, 
+            { runtime: 'tfjs', modelType: 'general' }
+        );
+        modelReady = true;
+        postMessage({ status: 'ready' });
+    } catch (error) {
+        postMessage({ 
+            status: 'error', 
+            message: `Model initialization failed: ${error.message}` 
+        });
+    }
 }
 
+// Start initialization
 initModel();
 
 // Listen for messages from the main UI thread
 self.onmessage = async function(e) {
-    if (e.data.type === 'segment' && segmenter) {
+    if (e.data.type === 'segment' && modelReady && segmenter) {
         try {
             const { imageData, requestId } = e.data;
-            const people = await segmenter.segmentPeople(imageData);
+            
+            if (!imageData || !imageData.data) {
+                throw new Error('Invalid ImageData received');
+            }
+
+            // Convert ImageData to tensor
+            const imageTensor = tf.browser.fromPixels(imageData);
+            
+            // Run segmentation
+            const people = await segmenter.segmentPeople(imageTensor);
+            
+            // Generate binary mask
             const mask = await bodySegmentation.toBinaryMask(people);
             
-            // Send the mask data back to the main thread as grayscale with width and height
+            // Convert mask to typed array if needed
+            const maskArray = mask instanceof tf.Tensor 
+                ? await mask.data() 
+                : mask;
+            
+            // Clean up tensors
+            imageTensor.dispose();
+            if (mask instanceof tf.Tensor) mask.dispose();
+            
+            // Send the mask data back to the main thread
             postMessage({ 
-                status: 'success', 
+                status: 'success',
                 maskData: {
-                    data: mask,
+                    data: new Uint8Array(maskArray),
                     width: imageData.width,
                     height: imageData.height
                 },

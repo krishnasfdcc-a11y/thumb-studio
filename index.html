@@ -14,8 +14,21 @@
 <body>
     <div id="root"></div>
     
-    <!-- Load our new Vanilla Canvas Core logic -->
+    <!-- Load Vanilla Canvas Core logic -->
     <script src="js/core.js"></script>
+    
+    <!-- Load Module System (order matters!) -->
+    <script src="js/modules/state.js"></script>
+    <script src="js/modules/worker-manager.js"></script>
+    <script src="js/modules/segmentation.js"></script>
+    
+    <!-- Initialize modules -->
+    <script>
+        window.aiWorkerManager.initialize().catch(err => {
+            console.error('Failed to initialize AI worker:', err);
+        });
+    </script>
+    
     <!-- Tell Babel to process our React file -->
     <script type="text/babel" src="js/app.js"></script>
 </body>
