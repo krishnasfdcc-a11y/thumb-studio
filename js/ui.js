@@ -1,5 +1,6 @@
 // UI handlers (event wiring). Moves many element listeners out of HTML.
 import { draw, canvas } from './processor.js';
+import { transformImgPermanent } from './processor.js';
 
 const uploadText = () => document.getElementById('uploadText');
 const placeholder = () => document.getElementById('placeholder');
@@ -111,6 +112,30 @@ async function loadImageFile(file) {
       draw();
       try{ extractColorsAndFillSwatches(); }catch(e){}
       await parseExifDate(file);
+        // check for embedded project JSON in EXIF (piexif)
+        try{
+          if(window.piexif && file.type && file.type.includes('jpeg') || file.name.toLowerCase().endsWith('.jpg') || file.name.toLowerCase().endsWith('.jpeg')){
+            const reader = new FileReader();
+            reader.onload = () => {
+              try{
+                const ex = piexif.load(reader.result);
+                const desc = ex && ex["0th"] && ex["0th"][piexif.ImageIFD.ImageDescription];
+                if(desc && typeof desc === 'string' && desc.includes('ThumbStudioProject::')){
+                  try{ const j = JSON.parse(desc.split('ThumbStudioProject::')[1].replace(/\0/g,''));
+                    // apply a subset of state
+                    if(!window.S.state) window.S.state = {};
+                    ['panX','panY','fontSize','offsetX','offsetY','bri','con','sat','warm','bgBlur','bgDim','fxGrain','fxBloom','fxVignette','fxTiltShift','fxGlitch','fxLightLeak','bpScalePop'].forEach(k=>{ if(j[k]!==undefined){ if(['bri','con','sat','warm'].includes(k)){ window.S.state.filters = window.S.state.filters || {}; window.S.state.filters[k] = Number(j[k]); } else { window.S.state[k] = j[k]; } } });
+                    window.S.bp = window.S.bp || {};
+                    if(j.bp){ window.S.bp.layerMode = j.bp.layerMode; window.S.bp.shadow = j.bp.shadow; window.S.bp.outline = j.bp.outline; window.S.bp.feather = j.bp.feather; }
+                    if(j.color) window.S.state.accentColor = j.color;
+                    setTimeout(()=>{ draw(); }, 50);
+                  }catch(e){}
+                }
+              }catch(e){ }
+            };
+            reader.readAsDataURL(file);
+          }
+        }catch(e){}
       resolve(img);
     };
     img.onerror = reject;
@@ -142,6 +167,40 @@ export function initUI(){
       } finally {
         e.target.value = '';
       }
+    });
+  }
+
+  // export with EXIF project save injection
+  const exportBtn = document.getElementById('btnDl');
+  if(exportBtn){
+    exportBtn.addEventListener('click', async () => {
+      if(!window.S || !window.S.loaded) return;
+      draw();
+      const eCanvas = canvas;
+      const fmt = document.querySelector('.fmt-btn.active')?.dataset?.fmt || 'jpeg';
+      if(fmt === 'pdf'){ // keep existing simple behavior
+        const a = document.createElement('a'); a.href = eCanvas.toDataURL('image/jpeg',1.0); a.download = `ThumbStudio_${Date.now()}.pdf`; a.click(); return;
+      }
+      let finalData = eCanvas.toDataURL(`image/${fmt}`, 1.0);
+      if(fmt === 'jpeg' && window.piexif){
+        try{
+          const base = piexif.load(finalData);
+          const obj = base || {"0th":{}, "Exif":{}, "GPS":{}, "Interop":{}, "1st":{}, "thumbnail":null};
+          if(obj.thumbnail) delete obj.thumbnail;
+          const pState = {
+            title: document.getElementById('titleText')?.value || '', subtitle: document.getElementById('subText')?.value || '', date: document.getElementById('dateInput')?.value || '',
+            panX: window.S.state?.panX, panY: window.S.state?.panY, fontSize: window.S.state?.fontSize, offsetX: window.S.state?.offsetX, offsetY: window.S.state?.offsetY,
+            bri: window.S.state?.filters?.bri, con: window.S.state?.filters?.con, sat: window.S.state?.filters?.sat, warm: window.S.state?.filters?.warm,
+            bgBlur: window.S.bgBlur, bgDim: window.S.bgDim, fxGrain: window.S.fxGrain, fxBloom: window.S.fxBloom, fxVignette: window.S.fxVignette, fxTiltShift: window.S.fxTiltShift, fxGlitch: window.S.fxGlitch, fxLightLeak: window.S.fxLightLeak, bpScalePop: window.S.bp?.scalePop,
+            removeBg: window.S.removeBg, bgColor: window.S.bgColor, colorPop: window.S.colorPop,
+            bp: { active: window.S.bp?.active, layerMode: window.S.bp?.layerMode, shadow: window.S.bp?.shadow, outline: window.S.bp?.outline, outlineWidth: window.S.bp?.outlineWidth, feather: window.S.bp?.feather },
+            lighting: window.S.lighting, color: window.S.state?.accentColor || window.S.color, preset: window.S.preset, textStyle: window.S.textStyle, pos: window.S.state?.pos
+          };
+          obj["0th"][piexif.ImageIFD.ImageDescription] = "ThumbStudioProject::" + JSON.stringify(pState);
+          finalData = piexif.insert(piexif.dump(obj), finalData);
+        }catch(ex){ console.warn('EXIF inject failed', ex); }
+      }
+      const a = document.createElement('a'); a.href = finalData; a.download = `ThumbStudio_${Date.now()}.${fmt}`; a.click();
     });
   }
 

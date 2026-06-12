@@ -25,6 +25,32 @@ export function initCanvas(){
   };
 }
 
+// Make transforms permanent by drawing to a temp canvas and replacing S.img.src
+export async function transformImgPermanent(type){
+  if(!window.S || !window.S.loaded) return;
+  const img = window.S.img;
+  const w = img.naturalWidth; const h = img.naturalHeight;
+  const tc = document.createElement('canvas'); const tctx = tc.getContext('2d');
+  if(type === 'rotL' || type === 'rotR') { tc.width = h; tc.height = w; } else { tc.width = w; tc.height = h; }
+  tctx.save();
+  if(type === 'rotL') { tctx.translate(0, w); tctx.rotate(-Math.PI/2); }
+  if(type === 'rotR') { tctx.translate(h, 0); tctx.rotate(Math.PI/2); }
+  if(type === 'flipH') { tctx.translate(w, 0); tctx.scale(-1, 1); }
+  if(type === 'flipV') { tctx.translate(0, h); tctx.scale(1, -1); }
+  tctx.drawImage(img, 0, 0);
+  tctx.restore();
+
+  return new Promise((resolve) => {
+    const newImg = new Image();
+    newImg.onload = () => {
+      // reset masks / bp state because pixel coords changed
+      if(window.S.bp){ window.S.bp.mask = null; window.S.bp.active = false; window.S.bp.originalMaskData = null; }
+      window.S.img = newImg; window.S.loaded = true; resolve(newImg);
+    };
+    newImg.src = tc.toDataURL('image/jpeg', 1.0);
+  });
+}
+
 function parseRatioString(mode){
   if(!mode || mode === 'original') return null;
   const parts = String(mode).split(':');
