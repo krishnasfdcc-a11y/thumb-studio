@@ -46,23 +46,21 @@ self.onmessage = async function(e) {
             // Run segmentation
             const people = await segmenter.segmentPeople(imageTensor);
             
-            // Generate binary mask
-            const mask = await bodySegmentation.toBinaryMask(people);
-            
-            // Convert mask to typed array if needed
-            const maskArray = mask instanceof tf.Tensor 
-                ? await mask.data() 
-                : mask;
+            // Generate binary mask with transparent background
+            const mask = await bodySegmentation.toBinaryMask(
+                people,
+                {r: 255, g: 255, b: 255, a: 255}, 
+                {r: 0, g: 0, b: 0, a: 0}          
+            );
             
             // Clean up tensors
             imageTensor.dispose();
-            if (mask instanceof tf.Tensor) mask.dispose();
             
             // Send the mask data back to the main thread
             postMessage({ 
                 status: 'success',
                 maskData: {
-                    data: new Uint8Array(maskArray),
+                    data: mask.data,
                     width: imageData.width,
                     height: imageData.height
                 },

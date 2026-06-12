@@ -8,6 +8,7 @@ class CanvasEngine {
         this.ctx = canvas.getContext('2d');
         // Cache offscreen canvases for performance to avoid garbage collection stutter
         this.layers = {
+            backdrop: document.createElement('canvas'),
             subject: document.createElement('canvas'),
             shadow: document.createElement('canvas'),
             text: document.createElement('canvas'),
@@ -70,16 +71,11 @@ class CanvasEngine {
     makeMaskCanvas(maskObj, width, height) {
         const source = this.getLayer('maskSource', maskObj.width, maskObj.height);
         const sourceCtx = source.getContext('2d');
-        const imageData = sourceCtx.createImageData(maskObj.width, maskObj.height);
-
-        for (let i = 0; i < maskObj.mask.length; i += 1) {
-            const alpha = maskObj.mask[i];
-            const offset = i * 4;
-            imageData.data[offset] = 255;
-            imageData.data[offset + 1] = 255;
-            imageData.data[offset + 2] = 255;
-            imageData.data[offset + 3] = alpha;
-        }
+        const imageData = new ImageData(
+            new Uint8ClampedArray(maskObj.mask),
+            maskObj.width,
+            maskObj.height
+        );
 
         sourceCtx.putImageData(imageData, 0, 0);
         const maskCanvas = this.getLayer('mask', width, height);
@@ -204,6 +200,13 @@ class CanvasEngine {
         this.canvas.height = math.canvasHeight;
         this.ctx.clearRect(0, 0, math.canvasWidth, math.canvasHeight);
 
+        // 1. Draw base original photo as background
+        const backgroundLayer = this.getLayer('backdrop', math.canvasWidth, math.canvasHeight);
+        const bgCtx = backgroundLayer.getContext('2d');
+        this.applyPhotoTransform(bgCtx, state, math);
+        bgCtx.drawImage(state.image, -state.image.width / 2, -state.image.height / 2, state.image.width, state.image.height);
+        bgCtx.restore();
+
         const subjectLayer = this.getLayer('subject', math.canvasWidth, math.canvasHeight);
         const maskCanvas = state.segmentationEnabled && state.segmentationMask && state.segmentationMask.mask
             ? this.makeMaskCanvas(state.segmentationMask, math.canvasWidth, math.canvasHeight)
@@ -226,10 +229,11 @@ class CanvasEngine {
         const textLayer = this.getLayer('text', math.canvasWidth, math.canvasHeight);
         this.drawTextLayer(textLayer.getContext('2d'), math.canvasWidth, math.canvasHeight);
 
-        this.ctx.drawImage(shadowLayer, 0, 0);
+        this.ctx.drawImage(backgroundLayer, 0, 0);
 
         if (state.textBehindSubject) {
             this.ctx.drawImage(textLayer, 0, 0);
+            this.ctx.drawImage(shadowLayer, 0, 0);
             this.ctx.drawImage(subjectLayer, 0, 0);
         } else {
             this.ctx.drawImage(subjectLayer, 0, 0);
