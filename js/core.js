@@ -136,6 +136,23 @@ class CanvasEngine {
         }
     }
 
+    applyXRayOutline(ctx, maskCanvas, color, thickness) {
+        ctx.save();
+        // We will draw the maskCanvas multiple times in a circle to create a stroke.
+        const steps = 8; // number of steps in the circle
+        for (let i = 0; i < steps; i++) {
+            const angle = (i * 2 * Math.PI) / steps;
+            const dx = Math.cos(angle) * thickness;
+            const dy = Math.sin(angle) * thickness;
+            ctx.drawImage(maskCanvas, dx, dy);
+        }
+        // Now, colorize the drawn mask (which is now a thicker outline) by using source-in.
+        ctx.globalCompositeOperation = 'source-in';
+        ctx.fillStyle = color;
+        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        ctx.restore();
+    }
+
     drawShadow(ctx, sourceCanvas, strength, lightAngle) {
         if (!sourceCanvas) return;
 
@@ -174,6 +191,7 @@ class CanvasEngine {
         overlayCtx.fillRect(0, 0, width, height);
         overlayCtx.globalCompositeOperation = 'destination-in';
         overlayCtx.drawImage(maskCanvas, 0, 0, width, height);
+
         ctx.drawImage(overlay, 0, 0);
     }
 
@@ -218,6 +236,16 @@ class CanvasEngine {
             ? this.makeMaskCanvas(state.segmentationMask, math.canvasWidth, math.canvasHeight)
             : null;
         this.drawSubjectLayer(subjectLayer.getContext('2d'), state, math, maskCanvas);
+
+        // Apply X-ray outline if we have a mask
+        if (maskCanvas) {
+            this.applyXRayOutline(subjectLayer.getContext('2d'), maskCanvas, '#00ff00', 2);
+        }
+
+        // Apply rim relighting if we have a mask
+        if (maskCanvas) {
+            this.drawRimLight(subjectLayer.getContext('2d'), maskCanvas, math.canvasWidth, math.canvasHeight, state.lightAngle);
+        }
 
         const shadowLayer = this.createLayer(math.canvasWidth, math.canvasHeight);
         this.drawShadow(shadowLayer.getContext('2d'), subjectLayer, state.shadowStrength, state.lightAngle);

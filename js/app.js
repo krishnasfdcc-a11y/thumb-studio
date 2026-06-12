@@ -44,18 +44,19 @@ function App() {
             segmentationWorkerRef.current = worker;
 
             worker.onmessage = (event) => {
-                const { type, payload } = event.data;
-                if (type === 'ready') {
+                const { status, message, requestId } = event.data;
+                if (status === 'ready') {
                     setSegmentationReady(true);
                     setSegmentationStatus('Segmentation worker ready');
                 }
-                if (type === 'mask') {
-                    if (payload.requestId !== segmentationRequestIdRef.current) return;
+                if (status === 'success') {
+                    const { maskData } = event.data; // maskData is { data, width, height }
+                    if (requestId !== segmentationRequestIdRef.current) return;
                     setSegmentationStatus('Segmentation mask received');
-                    setSegmentationMask({ mask: payload.mask, width: payload.width, height: payload.height });
+                    setSegmentationMask({ mask: maskData.data, width: maskData.width, height: maskData.height });
                 }
-                if (type === 'error') {
-                    setSegmentationStatus(`Segmentation error: ${payload.message}`);
+                if (status === 'error') {
+                    setSegmentationStatus(`Segmentation error: ${message}`);
                     setSegmentationEnabled(false);
                 }
             };
@@ -172,7 +173,7 @@ function App() {
 
         const imageData = offscreenCtx.getImageData(0, 0, downsampleWidth, downsampleHeight);
         segmentationWorkerRef.current.postMessage(
-            { type: 'segment', payload: { pixels: imageData.data, width: downsampleWidth, height: downsampleHeight, requestId } },
+            { type: 'segment', imageData: imageData, requestId },
             [imageData.data.buffer]
         );
         setSegmentationStatus('Dispatching frame to segmentation worker');

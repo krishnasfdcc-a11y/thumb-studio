@@ -1,34 +1,49 @@
-// Web Worker for lightweight MediaPipe-style segmentation.
-// This module expects image pixels from the main thread at a small, performance-friendly resolution.
+// Import the WASM binaries inside the worker
+importScripts(
+    'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs@4.14.0/dist/tf.min.js',
+    'https://cdn.jsdelivr.net/npm/@mediapipe/selfie_segmentation/selfie_segmentation.js',
+    'https://cdn.jsdelivr.net/npm/@tensorflow-models/body-segmentation/dist/body-segmentation.min.js'
+);
 
-self.onmessage = async (event) => {
-    const message = event.data;
+let segmenter = null;
 
-    if (message.type === 'segment') {
+// Initialize the model when the worker loads
+async function initModel() {
+    await tf.setBackend('webgl');
+    await tf.ready();
+    segmenter = await bodySegmentation.createSegmenter(
+        bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation, 
+        { runtime: 'tfjs', modelType: 'general' }
+    );
+    postMessage({ status: 'ready' });
+}
+
+initModel();
+
+// Listen for messages from the main UI thread
+self.onmessage = async function(e) {
+    if (e.data.type === 'segment' && segmenter) {
         try {
-            const { pixels, width, height, requestId } = message.payload;
-            const mask = computeAlphaMaskFromImage(pixels, width, height);
-            self.postMessage({ type: 'mask', payload: { mask, width, height, requestId } });
+            const { imageData, requestId } = e.data;
+            const people = await segmenter.segmentPeople(imageData);
+            const mask = await bodySegmentation.toBinaryMask(people);
+            
+            // Send the mask data back to the main thread as grayscale with width and height
+            postMessage({ 
+                status: 'success', 
+                maskData: {
+                    data: mask,
+                    width: imageData.width,
+                    height: imageData.height
+                },
+                requestId
+            });
         } catch (error) {
-            self.postMessage({ type: 'error', payload: { message: error.message || 'Segmentation failed' } });
+            postMessage({ 
+                status: 'error', 
+                message: error.message,
+                requestId: e.data.requestId 
+            });
         }
     }
 };
-
-self.postMessage({ type: 'ready' });
-
-function computeAlphaMaskFromImage(pixels, width, height) {
-    const mask = new Uint8ClampedArray(width * height);
-    const threshold = 100;
-
-    for (let i = 0, j = 0; i < pixels.length; i += 4, j += 1) {
-        const r = pixels[i];
-        const g = pixels[i + 1];
-        const b = pixels[i + 2];
-
-        const brightness = (r * 0.299 + g * 0.587 + b * 0.114) | 0;
-        mask[j] = brightness > threshold ? 255 : 0;
-    }
-
-    return mask;
-}
