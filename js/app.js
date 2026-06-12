@@ -193,7 +193,7 @@ function App() {
             </aside>
 
             <main className="workspace">
-                <div className="canvas-container">
+                <div className="canvas-container" ref={containerRef}>
                     <canvas ref={canvasRef} onMouseDown={handleMouseDown}></canvas>
                 </div>
             </main>
