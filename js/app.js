@@ -12,6 +12,7 @@ function hideGlobalLoader() {
 
 document.addEventListener('DOMContentLoaded', () => {
   initCanvas();
+  resetS();
   initUI();
   initPointerEvents();
   hideGlobalLoader();
