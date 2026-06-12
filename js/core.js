@@ -8,7 +8,6 @@ class CanvasEngine {
         this.ctx = canvas.getContext('2d');
         // Cache offscreen canvases for performance to avoid garbage collection stutter
         this.layers = {
-            backdrop: document.createElement('canvas'),
             subject: document.createElement('canvas'),
             shadow: document.createElement('canvas'),
             text: document.createElement('canvas'),
@@ -66,41 +65,6 @@ class CanvasEngine {
             canvas.getContext('2d').clearRect(0, 0, width, height);
         }
         return canvas;
-    }
-
-    drawBackdrop(ctx, style, width, height) {
-        if (style === 'flat') {
-            ctx.fillStyle = '#111827';
-            ctx.fillRect(0, 0, width, height);
-            return;
-        }
-
-        if (style === 'noise') {
-            ctx.fillStyle = '#111827';
-            ctx.fillRect(0, 0, width, height);
-            ctx.fillStyle = 'rgba(255,255,255,0.04)';
-            for (let i = 0; i < 1100; i += 1) {
-                const x = Math.random() * width;
-                const y = Math.random() * height;
-                const size = Math.random() * 2.4;
-                ctx.fillRect(x, y, size, size);
-            }
-            return;
-        }
-
-        const gradient = ctx.createRadialGradient(
-            width * 0.5,
-            height * 0.35,
-            width * 0.05,
-            width * 0.5,
-            height * 0.5,
-            Math.max(width, height) * 0.9
-        );
-        gradient.addColorStop(0, '#1e293b');
-        gradient.addColorStop(0.4, '#0f172a');
-        gradient.addColorStop(1, '#020617');
-        ctx.fillStyle = gradient;
-        ctx.fillRect(0, 0, width, height);
     }
 
     makeMaskCanvas(maskObj, width, height) {
@@ -240,9 +204,6 @@ class CanvasEngine {
         this.canvas.height = math.canvasHeight;
         this.ctx.clearRect(0, 0, math.canvasWidth, math.canvasHeight);
 
-        const backdropLayer = this.getLayer('backdrop', math.canvasWidth, math.canvasHeight);
-        this.drawBackdrop(backdropLayer.getContext('2d'), state.backdropStyle, math.canvasWidth, math.canvasHeight);
-
         const subjectLayer = this.getLayer('subject', math.canvasWidth, math.canvasHeight);
         const maskCanvas = state.segmentationEnabled && state.segmentationMask && state.segmentationMask.mask
             ? this.makeMaskCanvas(state.segmentationMask, math.canvasWidth, math.canvasHeight)
@@ -265,7 +226,6 @@ class CanvasEngine {
         const textLayer = this.getLayer('text', math.canvasWidth, math.canvasHeight);
         this.drawTextLayer(textLayer.getContext('2d'), math.canvasWidth, math.canvasHeight);
 
-        this.ctx.drawImage(backdropLayer, 0, 0);
         this.ctx.drawImage(shadowLayer, 0, 0);
 
         if (state.textBehindSubject) {

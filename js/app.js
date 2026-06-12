@@ -196,13 +196,6 @@ function App() {
                     </div>
                     <div className="status-indicator">{state.segmentationStatus}</div>
 
-                    <label>Backdrop Style</label>
-                    <select value={state.backdropStyle} onChange={e => window.globalState.setState({ backdropStyle: e.target.value })}>
-                        <option value="studio">Studio Gradient</option>
-                        <option value="flat">Flat Color</option>
-                        <option value="noise">Textured Noise</option>
-                    </select>
-
                     <label>Light Angle: {state.lightAngle}°</label>
                     <input type="range" min="0" max="360" step="1" value={state.lightAngle} onChange={e => window.globalState.setState({ lightAngle: parseInt(e.target.value) })} />
 

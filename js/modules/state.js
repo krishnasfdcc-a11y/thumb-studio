@@ -29,7 +29,6 @@ class GlobalState {
             textBehindSubject: true,
             shadowStrength: 0.7,
             lightAngle: 45,
-            backdropStyle: 'studio',
 
             // Container & Rendering
             containerSize: { width: 0, height: 0 }
