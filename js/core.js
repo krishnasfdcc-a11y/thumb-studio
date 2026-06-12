@@ -12,6 +12,9 @@ class CanvasEngine {
             subject: document.createElement('canvas'),
             shadow: document.createElement('canvas'),
             text: document.createElement('canvas'),
+            doodle: document.createElement('canvas'), // Layer for freehand doodles
+            bloom: document.createElement('canvas'), // Layer for bloom effect
+            glitch: document.createElement('canvas'), // Layer for glitch effect
             mask: document.createElement('canvas'),
             maskSource: document.createElement('canvas'),
             outline: document.createElement('canvas')
@@ -83,6 +86,26 @@ class CanvasEngine {
         maskCtx.imageSmoothingEnabled = true;
         maskCtx.drawImage(source, 0, 0, width, height);
         return maskCanvas;
+    }
+
+    // Apply mask correction strokes onto the mask canvas.
+    // Strokes are arrays of points in canvas-space.
+    applyMaskCorrection(maskCanvas, strokes, strength = 0.85) {
+        if (!maskCanvas || !strokes || strokes.length === 0) return;
+        const ctx = maskCanvas.getContext('2d');
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-over';
+        ctx.fillStyle = 'white';
+        const radius = Math.max(1, strength * 24);
+        strokes.forEach(stroke => {
+            if (!stroke.points) return;
+            stroke.points.forEach(p => {
+                ctx.beginPath();
+                ctx.arc(p.x, p.y, radius, 0, Math.PI * 2);
+                ctx.fill();
+            });
+        });
+        ctx.restore();
     }
 
     applyPhotoTransform(ctx, state, math) {
@@ -167,15 +190,55 @@ class CanvasEngine {
         ctx.restore();
     }
 
-    drawTextLayer(ctx, width, height) {
+    // Draw dynamic text layer based on state.text configuration
+    drawTextLayer(ctx, width, height, text) {
+        // Provide defaults if text object is missing
+        const {
+            value = 'AI SUBJECT LAYER',
+            x = 0.5,
+            y = 0.2,
+            size = 40,
+            color = 'rgba(255,255,255,0.92)',
+            shadow = true,
+            shadowBlur = 18,
+            rotation = 0,
+            weight = '700'
+        } = text || {};
+
         ctx.save();
-        ctx.font = '700 40px Inter, system-ui, sans-serif';
+        ctx.font = `${weight} ${size}px Inter, system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = 'rgba(255,255,255,0.92)';
-        ctx.shadowColor = 'rgba(0,0,0,0.35)';
-        ctx.shadowBlur = 18;
-        ctx.fillText('AI SUBJECT LAYER', width * 0.5, height * 0.2);
+        ctx.fillStyle = color;
+        if (shadow) {
+            ctx.shadowColor = 'rgba(0,0,0,0.35)';
+            ctx.shadowBlur = shadowBlur;
+        }
+        // Translate to the desired position and apply rotation
+        ctx.translate(width * x, height * y);
+        ctx.rotate((rotation * Math.PI) / 180);
+        ctx.fillText(value, 0, 0);
+        ctx.restore();
+    }
+
+    // Render doodle strokes onto their layer
+    drawDoodleLayer(ctx, strokes) {
+        ctx.clearRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        if (!strokes || strokes.length === 0) return;
+        ctx.save();
+        ctx.lineCap = 'round';
+        strokes.forEach(stroke => {
+            const { points, color = '#fff', size = 2 } = stroke;
+            if (!points || points.length < 1) return;
+            ctx.strokeStyle = color;
+            ctx.lineWidth = size;
+            ctx.beginPath();
+            ctx.moveTo(points[0].x, points[0].y);
+            for (let i = 1; i < points.length; i++) {
+                ctx.lineTo(points[i].x, points[i].y);
+            }
+            ctx.stroke();
+        });
         ctx.restore();
     }
 
@@ -208,9 +271,14 @@ class CanvasEngine {
         bgCtx.restore();
 
         const subjectLayer = this.getLayer('subject', math.canvasWidth, math.canvasHeight);
-        const maskCanvas = state.segmentationEnabled && state.segmentationMask && state.segmentationMask.mask
+        let maskCanvas = state.segmentationEnabled && state.segmentationMask && state.segmentationMask.mask
             ? this.makeMaskCanvas(state.segmentationMask, math.canvasWidth, math.canvasHeight)
             : null;
+
+        // Apply any mask correction strokes (user-painted) directly to the mask canvas
+        if (maskCanvas && state.maskCorrectionStrokes && state.maskCorrectionStrokes.length > 0) {
+            this.applyMaskCorrection(maskCanvas, state.maskCorrectionStrokes, state.maskCorrectionStrength);
+        }
         this.drawSubjectLayer(subjectLayer.getContext('2d'), state, math, maskCanvas);
 
         // Apply X-ray outline if we have a mask
@@ -226,8 +294,32 @@ class CanvasEngine {
         const shadowLayer = this.getLayer('shadow', math.canvasWidth, math.canvasHeight);
         this.drawShadow(shadowLayer.getContext('2d'), subjectLayer, state.shadowStrength, state.lightAngle);
 
+        // Bloom effect: create a blurred additive pass from the subject layer
+        if (state.effects && state.effects.bloom && state.effects.bloom > 0) {
+            const bloomLayer = this.getLayer('bloom', math.canvasWidth, math.canvasHeight);
+            const bctx = bloomLayer.getContext('2d');
+            bctx.clearRect(0, 0, bloomLayer.width, bloomLayer.height);
+            // Draw subject into bloom buffer
+            bctx.drawImage(subjectLayer, 0, 0);
+            // Apply blur filter based on bloom amount
+            const blurPx = Math.round(state.effects.bloom * 40);
+            bctx.filter = `blur(${blurPx}px)`;
+            // Draw the blurred result back onto the bloom canvas
+            const temp = document.createElement('canvas');
+            temp.width = bloomLayer.width; temp.height = bloomLayer.height;
+            const tctx = temp.getContext('2d');
+            tctx.drawImage(bloomLayer, 0, 0);
+            bctx.clearRect(0, 0, bloomLayer.width, bloomLayer.height);
+            bctx.drawImage(temp, 0, 0);
+            bctx.filter = 'none';
+        }
+
         const textLayer = this.getLayer('text', math.canvasWidth, math.canvasHeight);
-        this.drawTextLayer(textLayer.getContext('2d'), math.canvasWidth, math.canvasHeight);
+        this.drawTextLayer(textLayer.getContext('2d'), math.canvasWidth, math.canvasHeight, state.text);
+
+        // Doodle layer (freehand strokes)
+        const doodleLayer = this.getLayer('doodle', math.canvasWidth, math.canvasHeight);
+        this.drawDoodleLayer(doodleLayer.getContext('2d'), state.doodleStrokes);
 
         this.ctx.drawImage(backgroundLayer, 0, 0);
 
@@ -238,6 +330,24 @@ class CanvasEngine {
         } else {
             this.ctx.drawImage(subjectLayer, 0, 0);
             this.ctx.drawImage(textLayer, 0, 0);
+        }
+
+        // Optionally draw bloom additive pass beneath doodles and grain
+        if (state.effects && state.effects.bloom && state.effects.bloom > 0) {
+            const bloomLayer = this.getLayer('bloom', math.canvasWidth, math.canvasHeight);
+            this.ctx.save();
+            this.ctx.globalCompositeOperation = 'lighter';
+            this.ctx.globalAlpha = Math.min(0.9, state.effects.bloom * 0.8);
+            this.ctx.drawImage(bloomLayer, 0, 0);
+            this.ctx.restore();
+        }
+
+        // Overlay doodle strokes on top of everything
+        this.ctx.drawImage(doodleLayer, 0, 0);
+
+        // Apply grain effect if enabled
+        if (state.effects && state.effects.grain && state.effects.grain > 0) {
+            this.applyGrain(this.ctx, state.effects.grain);
         }
 
         return math;

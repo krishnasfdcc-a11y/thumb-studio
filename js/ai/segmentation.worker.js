@@ -56,16 +56,18 @@ self.onmessage = async function(e) {
             // Clean up tensors
             imageTensor.dispose();
             
-            // Send the mask data back to the main thread
+            // Send the mask data back to the main thread.
+            // Structured clone preserves Uint8Array data for ImageData reconstruction.
+            const maskArray = new Uint8Array(mask.data);
             postMessage({ 
                 status: 'success',
                 maskData: {
-                    data: mask.data,
+                    data: maskArray,
                     width: imageData.width,
                     height: imageData.height
                 },
                 requestId
-            });
+            }, [maskArray.buffer]);
         } catch (error) {
             postMessage({ 
                 status: 'error', 
