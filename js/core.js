@@ -6,6 +6,16 @@ class CanvasEngine {
     constructor(canvas) {
         this.canvas = canvas;
         this.ctx = canvas.getContext('2d');
+        // Cache offscreen canvases for performance to avoid garbage collection stutter
+        this.layers = {
+            backdrop: document.createElement('canvas'),
+            subject: document.createElement('canvas'),
+            shadow: document.createElement('canvas'),
+            text: document.createElement('canvas'),
+            mask: document.createElement('canvas'),
+            maskSource: document.createElement('canvas'),
+            outline: document.createElement('canvas')
+        };
     }
 
     calculateRenderMath(baseWidth, state) {
@@ -47,10 +57,14 @@ class CanvasEngine {
         };
     }
 
-    createLayer(width, height) {
-        const canvas = document.createElement('canvas');
-        canvas.width = width;
-        canvas.height = height;
+    getLayer(name, width, height) {
+        const canvas = this.layers[name];
+        if (canvas.width !== width || canvas.height !== height) {
+            canvas.width = width;
+            canvas.height = height;
+        } else {
+            canvas.getContext('2d').clearRect(0, 0, width, height);
+        }
         return canvas;
     }
 
@@ -90,9 +104,7 @@ class CanvasEngine {
     }
 
     makeMaskCanvas(maskObj, width, height) {
-        const source = document.createElement('canvas');
-        source.width = maskObj.width;
-        source.height = maskObj.height;
+        const source = this.getLayer('maskSource', maskObj.width, maskObj.height);
         const sourceCtx = source.getContext('2d');
         const imageData = sourceCtx.createImageData(maskObj.width, maskObj.height);
 
@@ -106,9 +118,7 @@ class CanvasEngine {
         }
 
         sourceCtx.putImageData(imageData, 0, 0);
-        const maskCanvas = document.createElement('canvas');
-        maskCanvas.width = width;
-        maskCanvas.height = height;
+        const maskCanvas = this.getLayer('mask', width, height);
         const maskCtx = maskCanvas.getContext('2d');
         maskCtx.imageSmoothingEnabled = true;
         maskCtx.drawImage(source, 0, 0, width, height);
@@ -137,19 +147,27 @@ class CanvasEngine {
     }
 
     applyXRayOutline(ctx, maskCanvas, color, thickness) {
-        ctx.save();
-        // We will draw the maskCanvas multiple times in a circle to create a stroke.
-        const steps = 8; // number of steps in the circle
+        const width = ctx.canvas.width;
+        const height = ctx.canvas.height;
+        const outlineLayer = this.getLayer('outline', width, height);
+        const outlineCtx = outlineLayer.getContext('2d');
+        
+        const steps = 8; 
         for (let i = 0; i < steps; i++) {
             const angle = (i * 2 * Math.PI) / steps;
             const dx = Math.cos(angle) * thickness;
             const dy = Math.sin(angle) * thickness;
-            ctx.drawImage(maskCanvas, dx, dy);
+            outlineCtx.drawImage(maskCanvas, dx, dy);
         }
-        // Now, colorize the drawn mask (which is now a thicker outline) by using source-in.
-        ctx.globalCompositeOperation = 'source-in';
-        ctx.fillStyle = color;
-        ctx.fillRect(0, 0, ctx.canvas.width, ctx.canvas.height);
+        
+        outlineCtx.globalCompositeOperation = 'source-in';
+        outlineCtx.fillStyle = color;
+        outlineCtx.fillRect(0, 0, width, height);
+        outlineCtx.globalCompositeOperation = 'source-over';
+
+        ctx.save();
+        ctx.globalCompositeOperation = 'destination-over';
+        ctx.drawImage(outlineLayer, 0, 0);
         ctx.restore();
     }
 
@@ -168,8 +186,7 @@ class CanvasEngine {
         ctx.restore();
     }
 
-    drawRimLight(ctx, maskCanvas, width, height, lightAngle) {
-        if (!maskCanvas) return;
+    drawRimLight(ctx, width, height, lightAngle) {
 
         const gradient = ctx.createRadialGradient(
             width * 0.5 + Math.cos((lightAngle - 90) * Math.PI / 180) * width * 0.18,
@@ -183,16 +200,11 @@ class CanvasEngine {
         gradient.addColorStop(0.6, 'rgba(255,255,255,0.04)');
         gradient.addColorStop(1, 'rgba(255,255,255,0)');
 
-        const overlay = document.createElement('canvas');
-        overlay.width = width;
-        overlay.height = height;
-        const overlayCtx = overlay.getContext('2d');
-        overlayCtx.fillStyle = gradient;
-        overlayCtx.fillRect(0, 0, width, height);
-        overlayCtx.globalCompositeOperation = 'destination-in';
-        overlayCtx.drawImage(maskCanvas, 0, 0, width, height);
-
-        ctx.drawImage(overlay, 0, 0);
+        ctx.save();
+        ctx.globalCompositeOperation = 'source-atop';
+        ctx.fillStyle = gradient;
+        ctx.fillRect(0, 0, width, height);
+        ctx.restore();
     }
 
     drawTextLayer(ctx, width, height) {
@@ -228,10 +240,10 @@ class CanvasEngine {
         this.canvas.height = math.canvasHeight;
         this.ctx.clearRect(0, 0, math.canvasWidth, math.canvasHeight);
 
-        const backdropLayer = this.createLayer(math.canvasWidth, math.canvasHeight);
+        const backdropLayer = this.getLayer('backdrop', math.canvasWidth, math.canvasHeight);
         this.drawBackdrop(backdropLayer.getContext('2d'), state.backdropStyle, math.canvasWidth, math.canvasHeight);
 
-        const subjectLayer = this.createLayer(math.canvasWidth, math.canvasHeight);
+        const subjectLayer = this.getLayer('subject', math.canvasWidth, math.canvasHeight);
         const maskCanvas = state.segmentationEnabled && state.segmentationMask && state.segmentationMask.mask
             ? this.makeMaskCanvas(state.segmentationMask, math.canvasWidth, math.canvasHeight)
             : null;
@@ -244,13 +256,13 @@ class CanvasEngine {
 
         // Apply rim relighting if we have a mask
         if (maskCanvas) {
-            this.drawRimLight(subjectLayer.getContext('2d'), maskCanvas, math.canvasWidth, math.canvasHeight, state.lightAngle);
+            this.drawRimLight(subjectLayer.getContext('2d'), math.canvasWidth, math.canvasHeight, state.lightAngle);
         }
 
-        const shadowLayer = this.createLayer(math.canvasWidth, math.canvasHeight);
+        const shadowLayer = this.getLayer('shadow', math.canvasWidth, math.canvasHeight);
         this.drawShadow(shadowLayer.getContext('2d'), subjectLayer, state.shadowStrength, state.lightAngle);
 
-        const textLayer = this.createLayer(math.canvasWidth, math.canvasHeight);
+        const textLayer = this.getLayer('text', math.canvasWidth, math.canvasHeight);
         this.drawTextLayer(textLayer.getContext('2d'), math.canvasWidth, math.canvasHeight);
 
         this.ctx.drawImage(backdropLayer, 0, 0);
@@ -262,10 +274,6 @@ class CanvasEngine {
         } else {
             this.ctx.drawImage(subjectLayer, 0, 0);
             this.ctx.drawImage(textLayer, 0, 0);
-        }
-
-        if (maskCanvas) {
-            this.drawRimLight(this.ctx, maskCanvas, math.canvasWidth, math.canvasHeight, state.lightAngle);
         }
 
         return math;
