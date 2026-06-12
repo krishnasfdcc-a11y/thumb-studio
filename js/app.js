@@ -3,7 +3,13 @@
 import { initUI } from './ui.js';
 import { initCanvas } from './processor.js';
 
+function hideGlobalLoader() {
+  const loader = document.getElementById('globalLoader');
+  if (loader) loader.style.display = 'none';
+}
+
 document.addEventListener('DOMContentLoaded', () => {
   initCanvas();
   initUI();
+  hideGlobalLoader();
 });
