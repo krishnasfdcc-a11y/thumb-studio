@@ -119,17 +119,33 @@ function App() {
                     <label>Target Aspect Ratio</label>
                     <select value={aspectRatio} onChange={e => setAspectRatio(e.target.value)}>
                         <option value="original">Original Aspect Ratio</option>
-                        <optgroup label="Social Media">
-                            <option value={16/9}>16:9 (YouTube / Widescreen)</option>
-                            <option value={9/16}>9:16 (Shorts / Story)</option>
-                            <option value={1}>1:1 (Square / Instagram Post)</option>
-                            <option value={4/5}>4:5 (Instagram Portrait)</option>
+                        <optgroup label="Social Media & Video">
+                            <option value="16/9">16:9 (YouTube / Widescreen)</option>
+                            <option value="9/16">9:16 (Shorts / Story)</option>
+                            <option value="1/1">1:1 (Square / IG Post)</option>
+                            <option value="4/5">4:5 (IG Portrait)</option>
+                            <option value="5/4">5:4 (FB/Twitter Landscape)</option>
+                            <option value="4/3">4:3 (Standard TV / iPad)</option>
+                            <option value="3/4">3:4 (Pinterest Portrait)</option>
+                            <option value="21/9">21:9 (Ultrawide Cinematic)</option>
                         </optgroup>
-                        <optgroup label="Print">
-                            <option value={1/1.414}>A4 Portrait</option>
-                            <option value={1.414}>A4 Landscape</option>
-                            <option value={3/2}>3:2 (6x4" Photo)</option>
-                            <option value={2/3}>2:3 (4x6" Photo)</option>
+                        <optgroup label="Standard Print (R-Series)">
+                            <option value="3/2">3:2 (4R 6x4" Landscape)</option>
+                            <option value="2/3">2:3 (4R 4x6" Portrait)</option>
+                            <option value="7/5">7:5 (5R 7x5" Landscape)</option>
+                            <option value="5/7">5:7 (5R 5x7" Portrait)</option>
+                            <option value="8/6">4:3 (6R 8x6" Landscape)</option>
+                            <option value="6/8">3:4 (6R 6x8" Portrait)</option>
+                            <option value="10/8">5:4 (8R 10x8" Landscape)</option>
+                            <option value="8/10">4:5 (8R 8x10" Portrait)</option>
+                            <option value="14/11">14:11 (11R 14x11" Landscape)</option>
+                            <option value="11/14">11:14 (11R 11x14" Portrait)</option>
+                        </optgroup>
+                        <optgroup label="Documents">
+                            <option value="1/1.414">A4 Portrait</option>
+                            <option value="1.414/1">A4 Landscape</option>
+                            <option value="8.5/11">US Letter Portrait</option>
+                            <option value="11/8.5">US Letter Landscape</option>
                         </optgroup>
                     </select>
                     

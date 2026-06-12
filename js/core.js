@@ -14,6 +14,9 @@ class CanvasEngine {
         // Handle "original" aspect ratio string, otherwise parse the float value
         if (state.aspectRatio === 'original' && state.image) {
             currentAspectRatio = state.image.width / state.image.height;
+        } else if (typeof state.aspectRatio === 'string' && state.aspectRatio.includes('/')) {
+            const [num, den] = state.aspectRatio.split('/');
+            currentAspectRatio = parseFloat(num) / parseFloat(den);
         } else {
             // Provide a fallback if parsing fails for any reason
             currentAspectRatio = parseFloat(state.aspectRatio) || (16/9);
