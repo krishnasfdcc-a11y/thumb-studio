@@ -4,7 +4,7 @@ function App() {
     // 1. Declarative React State
     const [image, setImage] = useState(null);
     const [blobUrl, setBlobUrl] = useState(null);
-    const [aspectRatio, setAspectRatio] = useState(16 / 9);
+    const [aspectRatio, setAspectRatio] = useState('original');
     const [panX, setPanX] = useState(0.5);
     const [panY, setPanY] = useState(0.5);
     const [flipH, setFlipH] = useState(false);
@@ -117,11 +117,20 @@ function App() {
                 <div className="panel-section">
                     <h2>2. Math / Pan Constraints</h2>
                     <label>Target Aspect Ratio</label>
-                    <select value={aspectRatio} onChange={e => setAspectRatio(parseFloat(e.target.value))}>
-                        <option value={16/9}>16:9 (YouTube / Standard)</option>
-                        <option value={9/16}>9:16 (Shorts / Mobile)</option>
-                        <option value={1}>1:1 (Square)</option>
-                        <option value={1/1.414}>A4 (Print Portrait)</option>
+                    <select value={aspectRatio} onChange={e => setAspectRatio(e.target.value)}>
+                        <option value="original">Original Aspect Ratio</option>
+                        <optgroup label="Social Media">
+                            <option value={16/9}>16:9 (YouTube / Widescreen)</option>
+                            <option value={9/16}>9:16 (Shorts / Story)</option>
+                            <option value={1}>1:1 (Square / Instagram Post)</option>
+                            <option value={4/5}>4:5 (Instagram Portrait)</option>
+                        </optgroup>
+                        <optgroup label="Print">
+                            <option value={1/1.414}>A4 Portrait</option>
+                            <option value={1.414}>A4 Landscape</option>
+                            <option value={3/2}>3:2 (6x4" Photo)</option>
+                            <option value={2/3}>2:3 (4x6" Photo)</option>
+                        </optgroup>
                     </select>
                     
                     <label>Pan Offset X</label>
