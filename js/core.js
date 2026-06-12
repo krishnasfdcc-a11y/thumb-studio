@@ -47,19 +47,43 @@ class CanvasEngine {
     }
 
     // Fluid Workspace Renderer
-    render(state) {
-        if (!state.image) return null;
-        
-        const baseWidth = 1920; 
-        const math = this.calculateRenderMath(baseWidth, state);
-        
-        // Apply bounds to raw DOM node
+    render(state, containerWidth, containerHeight) {
+        // If there's no image or the container has no size, clear the canvas.
+        if (!state.image || !containerWidth || !containerHeight) {
+            if (this.canvas.width > 0 || this.canvas.height > 0) {
+                this.canvas.width = 0;
+                this.canvas.height = 0;
+            }
+            return null;
+        }
+
+        // 1. Get the target aspect ratio by reusing the logic in calculateRenderMath.
+        // We call it with a dummy width (1) to extract the ratio from the resulting height.
+        const tempMath = this.calculateRenderMath(1, state);
+        const targetAspectRatio = 1 / tempMath.canvasHeight; // Since baseWidth was 1, height is 1/ratio.
+
+        // 2. Calculate the final canvas dimensions that fit inside the container.
+        const containerAspectRatio = containerWidth / containerHeight;
+        let finalCanvasWidth;
+
+        if (targetAspectRatio > containerAspectRatio) {
+            // Target is wider than container -> limited by container width.
+            finalCanvasWidth = containerWidth;
+        } else {
+            // Target is narrower or same as container -> limited by container height.
+            finalCanvasWidth = containerHeight * targetAspectRatio;
+        }
+
+        // 3. Now, run the full math calculation with the correct, dynamic base width.
+        const math = this.calculateRenderMath(finalCanvasWidth, state);
+
+        // Apply the calculated, scaled bounds to the raw canvas element.
         this.canvas.width = math.canvasWidth;
         this.canvas.height = math.canvasHeight;
-        
+
         this.ctx.clearRect(0, 0, this.canvas.width, this.canvas.height);
-        
-        // Non-destructive drawing operations
+
+        // Non-destructive drawing operations (this part is unchanged).
         this.ctx.save();
         this.ctx.translate((math.canvasWidth / 2) + math.offsetX, (math.canvasHeight / 2) + math.offsetY);
         this.ctx.rotate(state.rotation * Math.PI / 180);
@@ -67,8 +91,8 @@ class CanvasEngine {
         this.ctx.scale(math.scale, math.scale);
         this.ctx.drawImage(state.image, -state.image.width / 2, -state.image.height / 2, state.image.width, state.image.height);
         this.ctx.restore();
-        
-        return math; // Expose calculated math so React can clamp mouse panning boundaries
+
+        return math; // Expose calculated math so React can clamp mouse panning boundaries.
     }
 }
 window.CanvasEngine = CanvasEngine;
