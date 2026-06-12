@@ -42,6 +42,7 @@ function App() {
         const img = new Image();
         img.onload = () => {
             setImage(img);
+            setAspectRatio('original');
             setPanX(0.5); setPanY(0.5);
             setFlipH(false); setFlipV(false); setRotation(0);
             setStatusText(`Active File: ${fileName}`);

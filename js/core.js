@@ -10,10 +10,11 @@ class CanvasEngine {
 
     // Math Engine (Pure)
     calculateRenderMath(baseWidth, state) {
+        const isRotated = state.rotation % 180 !== 0;
         let currentAspectRatio;
         // Handle "original" aspect ratio string, otherwise parse the float value
         if (state.aspectRatio === 'original' && state.image) {
-            currentAspectRatio = state.image.width / state.image.height;
+            currentAspectRatio = isRotated ? (state.image.height / state.image.width) : (state.image.width / state.image.height);
         } else if (typeof state.aspectRatio === 'string' && state.aspectRatio.includes('/')) {
             const [num, den] = state.aspectRatio.split('/');
             currentAspectRatio = parseFloat(num) / parseFloat(den);
@@ -25,7 +26,6 @@ class CanvasEngine {
         const canvasHeight = baseWidth / currentAspectRatio;
         if (!state.image) return { canvasWidth: baseWidth, canvasHeight };
 
-        const isRotated = state.rotation % 180 !== 0;
         const imgW = isRotated ? state.image.height : state.image.width;
         const imgH = isRotated ? state.image.width : state.image.height;
         
