@@ -264,10 +264,10 @@ export function initUI() {
       else if(id === 'panY') window.S.imgPanY = v;
       else if(id === 'offsetX') { window.S.offsetX = v; window.S.dragMode = false; }
       else if(id === 'offsetY') { window.S.offsetY = v; window.S.dragMode = false; }
-      else if(id === 'lightAngle') window.S.lighting = window.S.lighting || {angle:45, intensity:0}; window.S.lighting.angle = v;
-      else if(id === 'lightIntensity') window.S.lighting = window.S.lighting || {angle:45, intensity:0}; window.S.lighting.intensity = v;
-      else if(id === 'bpOutlineWidth') window.S.bp = window.S.bp || { active: false, mask: null, originalMaskData: null, feather: 0, layerMode: 'behind', outline: false, outlineWidth: 1, shadow: false, scalePop: 0 }; window.S.bp.outlineWidth = v;
-      else if(id === 'bpFeather') window.S.bp = window.S.bp || { active: false, mask: null, originalMaskData: null, feather: 0, layerMode: 'behind', outline: false, outlineWidth: 1, shadow: false, scalePop: 0 }; window.S.bp.feather = v;
+      else if(id === 'lightAngle') { window.S.lighting = window.S.lighting || {angle:45, intensity:0}; window.S.lighting.angle = v; }
+      else if(id === 'lightIntensity') { window.S.lighting = window.S.lighting || {angle:45, intensity:0}; window.S.lighting.intensity = v; }
+      else if(id === 'bpOutlineWidth') { window.S.bp = window.S.bp || { active: false, mask: null, originalMaskData: null, feather: 0, layerMode: 'behind', outline: false, outlineWidth: 1, shadow: false, scalePop: 0 }; window.S.bp.outlineWidth = v; }
+      else if(id === 'bpFeather') { window.S.bp = window.S.bp || { active: false, mask: null, originalMaskData: null, feather: 0, layerMode: 'behind', outline: false, outlineWidth: 1, shadow: false, scalePop: 0 }; window.S.bp.feather = v; }
       else if(id === 'brushSize') window.S.brushSize = v;
       else if(id.startsWith('fx')) { window.S[id] = v; }
       else if(id.startsWith('bg')) { window.S[id] = v; }
