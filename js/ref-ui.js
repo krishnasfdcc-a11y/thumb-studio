@@ -79,6 +79,22 @@ function restoreProject(p) {
     }, 100);
 }
 
+// TRANSFORM IMG (rotate/flip)
+window.transformImg = function(type) {
+    if(!S.loaded || !canvas || !ctx) return; 
+    showLoader("Transforming...");
+    setTimeout(() => {
+        const tc = document.createElement('canvas'); const tctx = tc.getContext('2d'); let w = S.img.naturalWidth, h = S.img.naturalHeight;
+        if(type === 'rotL' || type === 'rotR') { tc.width = h; tc.height = w; } else { tc.width = w; tc.height = h; }
+        tctx.save();
+        if(type === 'rotL') { tctx.translate(0, w); tctx.rotate(-Math.PI/2); } if(type === 'rotR') { tctx.translate(h, 0); tctx.rotate(Math.PI/2); }
+        if(type === 'flipH') { tctx.translate(w, 0); tctx.scale(-1, 1); } if(type === 'flipV') { tctx.translate(0, h); tctx.scale(1, -1); }
+        tctx.drawImage(S.img, 0, 0); tctx.restore();
+        S.img.onload = () => { S.bp.mask = null; S.bp.active = false; S.smartBg = null; const bc = document.getElementById('bpControls'); if(bc) bc.style.display = 'none'; draw(); hideLoader(); };
+        S.img.src = tc.toDataURL('image/jpeg', 1.0);
+    }, 50);
+};
+
 // INGESTION & DATE FIX
 const readExif = (file) => new Promise((resolve) => {
     const reader = new FileReader();
@@ -280,11 +296,36 @@ function paintMask(cX, cY) {
 canvas && canvas.addEventListener('mousedown', pD); canvas && canvas.addEventListener('mousemove', pM); window.addEventListener('mouseup', pU);
 canvas && canvas.addEventListener('touchstart', pD, {passive: false}); canvas && canvas.addEventListener('touchmove', pM, {passive: false}); window.addEventListener('touchend', pU);
 
+// Lazy-load TensorFlow + Body Segmentation scripts (only on demand)
+function loadTFScripts() {
+  return new Promise((resolve, reject) => {
+    if (typeof tf !== 'undefined' && typeof bodySegmentation !== 'undefined') { resolve(); return; }
+    const urls = [
+      'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-core',
+      'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-converter',
+      'https://cdn.jsdelivr.net/npm/@tensorflow/tfjs-backend-webgl',
+      'https://cdn.jsdelivr.net/npm/@tensorflow-models/body-segmentation'
+    ];
+    let loaded = 0;
+    urls.forEach(url => {
+      const s = document.createElement('script');
+      s.src = url;
+      s.onload = () => { loaded++; if (loaded === urls.length) setTimeout(resolve, 200); };
+      s.onerror = reject;
+      document.head.appendChild(s);
+    });
+  });
+}
+
 // AI ENGINE
 let bpModel = null; const btnDetect = document.getElementById('btnDetect'); const dStat = document.getElementById('detectStatus');
 if(btnDetect) btnDetect.addEventListener('click', async () => {
   if (!S.loaded) return alert('Upload a photo first!'); btnDetect.disabled = true;
-  showLoader('Running AI Subject Inference...');
+  showLoader('Loading AI Engine...');
+  try {
+    await loadTFScripts();
+    showLoader('Running AI Subject Inference...');
+  } catch(e) { hideLoader(); btnDetect.disabled = false; dStat && (dStat.innerHTML = 'Failed to load AI.'); return; }
   setTimeout(async () => {
       try {
         if (!bpModel) { await tf.setBackend('webgl'); await tf.ready(); bpModel = await bodySegmentation.createSegmenter(bodySegmentation.SupportedModels.MediaPipeSelfieSegmentation, { runtime: 'tfjs', modelType: 'general' }); }
