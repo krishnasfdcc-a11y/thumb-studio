@@ -79,19 +79,40 @@ function restoreProject(p) {
     }, 100);
 }
 
-// TRANSFORM IMG (rotate/flip)
+// TRANSFORM IMG (rotate/flip) 
 window.transformImg = function(type) {
-    if(!S.loaded || !canvas || !ctx) return; 
+    if(!S.loaded || !S.img || !S.img.naturalWidth) return alert('Upload a photo first!');
+    if(!canvas || !ctx) return;
     showLoader("Transforming...");
     setTimeout(() => {
-        const tc = document.createElement('canvas'); const tctx = tc.getContext('2d'); let w = S.img.naturalWidth, h = S.img.naturalHeight;
-        if(type === 'rotL' || type === 'rotR') { tc.width = h; tc.height = w; } else { tc.width = w; tc.height = h; }
-        tctx.save();
-        if(type === 'rotL') { tctx.translate(0, w); tctx.rotate(-Math.PI/2); } if(type === 'rotR') { tctx.translate(h, 0); tctx.rotate(Math.PI/2); }
-        if(type === 'flipH') { tctx.translate(w, 0); tctx.scale(-1, 1); } if(type === 'flipV') { tctx.translate(0, h); tctx.scale(1, -1); }
-        tctx.drawImage(S.img, 0, 0); tctx.restore();
-        S.img.onload = () => { S.bp.mask = null; S.bp.active = false; S.smartBg = null; const bc = document.getElementById('bpControls'); if(bc) bc.style.display = 'none'; draw(); hideLoader(); };
-        S.img.src = tc.toDataURL('image/jpeg', 1.0);
+        try {
+            const w = S.img.naturalWidth, h = S.img.naturalHeight;
+            const tc = document.createElement('canvas');
+            if(type === 'rotL' || type === 'rotR') { tc.width = h; tc.height = w; } else { tc.width = w; tc.height = h; }
+            const tctx = tc.getContext('2d');
+            tctx.save();
+            if(type === 'rotL') { tctx.translate(0, tc.width); tctx.rotate(-Math.PI/2); }
+            if(type === 'rotR') { tctx.translate(tc.height, 0); tctx.rotate(Math.PI/2); }
+            if(type === 'flipH') { tctx.translate(tc.width, 0); tctx.scale(-1, 1); }
+            if(type === 'flipV') { tctx.translate(0, tc.height); tctx.scale(1, -1); }
+            tctx.drawImage(S.img, 0, 0);
+            tctx.restore();
+            
+            // Create a fresh image for the result
+            const result = new Image();
+            result.onload = function() {
+                S.img = result;
+                S.bp.mask = null;
+                S.bp.active = false;
+                S.smartBg = null;
+                const bc = document.getElementById('bpControls');
+                if(bc) bc.style.display = 'none';
+                draw();
+                hideLoader();
+            };
+            result.onerror = function() { hideLoader(); alert('Transform failed'); };
+            result.src = tc.toDataURL('image/png'); // Use PNG to avoid EXIF corruption
+        } catch(e) { hideLoader(); alert('Transform error: ' + e.message); }
     }, 50);
 };
 
