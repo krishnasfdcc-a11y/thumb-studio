@@ -46,6 +46,33 @@ class GlobalState {
             palette: [],
             maskCorrectionStrokes: [],
 
+            // Color & Preset extras (from ref.html)
+            extractedColors: ['#3ddc84', '#7c6fff'],
+            color: '#ffffff', // can be 'grad-gold' or 'grad-#RRGGBB-#RRGGBB'
+            colorPop: false,
+            removeBg: false,
+            bgColor: '#ffffff',
+
+            // Background/subject parameters (BP = background/portrait)
+            bp: {
+                active: false,
+                mask: null,
+                originalMaskData: null,
+                feather: 0,
+                layerMode: 'behind',
+                outline: false,
+                outlineWidth: 1,
+                shadow: false,
+                scalePop: 0
+            },
+
+            lighting: { angle: 45, intensity: 0 },
+            watermark: { img: null, size: 15, op: 80 },
+            customFont: null,
+            fontSize: 4,
+            offsetX: 0,
+            offsetY: 0,
+
             // Effects & Lighting
             textBehindSubject: true,
             shadowStrength: 0.7,

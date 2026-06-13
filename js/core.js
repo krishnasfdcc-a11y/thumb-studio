@@ -71,6 +71,24 @@ class CanvasEngine {
         return canvas;
     }
 
+    // Create a gradient fill based on a color keyword or explicit gradient string
+    // Supports: 'grad-gold', 'grad-purple', 'grad-neon', and 'grad-#RRGGBB-#RRGGBB'
+    getGradientFill(context, colorKeyword, width) {
+        try {
+            if (!colorKeyword || typeof colorKeyword !== 'string') return colorKeyword;
+            const g = context.createLinearGradient(0, 0, width || context.canvas.width, 0);
+            if (colorKeyword === 'grad-gold') { g.addColorStop(0, '#f5c842'); g.addColorStop(1, '#ff5c6c'); }
+            else if (colorKeyword === 'grad-purple') { g.addColorStop(0, '#7c6fff'); g.addColorStop(1, '#00fff0'); }
+            else if (colorKeyword === 'grad-neon') { g.addColorStop(0, '#ff5500'); g.addColorStop(1, '#ff00a0'); }
+            else if (colorKeyword.startsWith('grad-#')) {
+                const parts = colorKeyword.split('-');
+                if (parts.length >= 3) { g.addColorStop(0, parts[1]); g.addColorStop(1, parts[2]); }
+                else return colorKeyword;
+            } else return colorKeyword;
+            return g;
+        } catch (e) { return colorKeyword; }
+    }
+
     makeMaskCanvas(maskObj, width, height) {
         const source = this.getLayer('maskSource', maskObj.width, maskObj.height);
         const sourceCtx = source.getContext('2d');
@@ -209,7 +227,9 @@ class CanvasEngine {
         ctx.font = `${weight} ${size}px Inter, system-ui, sans-serif`;
         ctx.textAlign = 'center';
         ctx.textBaseline = 'middle';
-        ctx.fillStyle = color;
+        let fillStyle = color;
+        if (typeof color === 'string' && color.startsWith('grad')) fillStyle = this.getGradientFill(ctx, color, ctx.canvas.width);
+        ctx.fillStyle = fillStyle;
         if (shadow) {
             ctx.shadowColor = 'rgba(0,0,0,0.35)';
             ctx.shadowBlur = shadowBlur;
@@ -322,6 +342,16 @@ class CanvasEngine {
         this.drawDoodleLayer(doodleLayer.getContext('2d'), state.doodleStrokes);
 
         this.ctx.drawImage(backgroundLayer, 0, 0);
+
+        // Optional duotone / color-pop overlay (applies to background only when mask exists)
+        if (state.colorPop && maskCanvas) {
+            this.ctx.save();
+            this.ctx.globalCompositeOperation = 'multiply';
+            const popColor = (state.extractedColors && state.extractedColors[0]) ? state.extractedColors[0] : (state.color || '#7c6fff');
+            this.ctx.fillStyle = popColor;
+            this.ctx.fillRect(0, 0, math.canvasWidth, math.canvasHeight);
+            this.ctx.restore();
+        }
 
         if (state.textBehindSubject) {
             this.ctx.drawImage(textLayer, 0, 0);

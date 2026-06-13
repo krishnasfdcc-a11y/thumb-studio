@@ -34,6 +34,16 @@ class AIWorkerManager {
                             width: maskData.width,
                             height: maskData.height
                         },
+                        bp: {
+                            ...window.globalState.getState().bp,
+                            active: true,
+                            mask: {
+                                mask: maskData.data,
+                                width: maskData.width,
+                                height: maskData.height
+                            },
+                            originalMaskData: null
+                        },
                         segmentationStatus: 'Mask received'
                     });
                     

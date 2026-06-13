@@ -32,6 +32,8 @@ function App() {
                 onFileSelected: ({ image, url, fileName, isConverted }) => {
                     // Extract dominant color palette from the loaded image
                     const palette = window.PaletteExtractor ? new window.PaletteExtractor().extract(image) : [];
+                    const extracted = palette.slice(0, 5);
+                    const primary = extracted[0] || '#7c6fff';
                     window.globalState.setState({
                         image,
                         blobUrl: url,
@@ -44,7 +46,10 @@ function App() {
                         rotation: 0,
                         segmentationMask: null,
                         segmentationStatus: 'Ready for segmentation',
-                        palette
+                        palette,
+                        extractedColors: extracted,
+                        color: primary,
+                        colorPop: false
                     });
                 }
             });
