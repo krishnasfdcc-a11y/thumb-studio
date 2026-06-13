@@ -39,26 +39,32 @@ class Uploader {
     }
 
     async convertAppleImageWithWorker(file) {
-        const worker = new Worker('js/heic-worker.js');
+        try {
+            const worker = new Worker('js/heic-worker.js');
 
-        return new Promise((resolve, reject) => {
-            worker.onmessage = (event) => {
-                const data = event.data;
-                if (data.success) {
-                    resolve(data.blob);
-                } else {
-                    reject(new Error(data.error || 'HEIC conversion failed'));
-                }
-                worker.terminate();
-            };
+            return await new Promise((resolve, reject) => {
+                worker.onmessage = (event) => {
+                    const data = event.data;
+                    if (data.success) {
+                        resolve(data.blob);
+                    } else {
+                        reject(new Error(data.error || 'HEIC conversion failed'));
+                    }
+                    worker.terminate();
+                };
 
-            worker.onerror = (error) => {
-                reject(new Error(error.message || 'HEIC worker failed'));
-                worker.terminate();
-            };
+                worker.onerror = (error) => {
+                    reject(new Error(error.message || 'HEIC worker failed'));
+                    worker.terminate();
+                };
 
-            worker.postMessage(file);
-        });
+                worker.postMessage(file);
+            });
+        } catch (err) {
+            // Worker creation failed (e.g., CSP or unsupported environment). Fall back to in-page converter.
+            this.onStatusChange?.('HEIC worker unavailable, falling back to main-thread converter');
+            return await this.convertAppleImageToPng(file);
+        }
     }
 
     async prepareFile(file) {
@@ -72,12 +78,90 @@ class Uploader {
             ? await this.convertAppleImageWithWorker(file)
             : file;
 
+        const url = URL.createObjectURL(normalizedBlob);
+        // Track created object URLs so caller can release them later
+        this._objectUrls = this._objectUrls || new Set();
+        this._objectUrls.add(url);
+
         return {
             file,
             blob: normalizedBlob,
-            url: URL.createObjectURL(normalizedBlob),
+            url,
             isConverted: normalizedBlob !== file
         };
+    }
+
+    // Create a hidden file input and wire it to call back with the selected file results.
+    // Usage: const input = uploader.createFileInput({ multiple: false, accept: 'image/*', onSelect: fn })
+    createFileInput({ multiple = false, accept = 'image/*', onSelect } = {}) {
+        const input = document.createElement('input');
+        input.type = 'file';
+        input.accept = accept;
+        input.multiple = !!multiple;
+        input.style.display = 'none';
+        document.body.appendChild(input);
+
+        input.addEventListener('change', async () => {
+            const files = Array.from(input.files || []);
+            const results = [];
+            for (const f of files) {
+                try {
+                    const res = await this.handleFile(f);
+                    results.push(res);
+                } catch (err) {
+                    this.onStatusChange?.(`Upload error: ${err.message}`);
+                }
+            }
+            if (typeof onSelect === 'function') onSelect(results);
+            input.value = '';
+        });
+
+        return input;
+    }
+
+    // Attach drag & drop support to an element. Calls handleFile for each dropped file.
+    attachDropZone(element, { multiple = false } = {}) {
+        if (!element) return;
+        const prevent = (e) => { e.preventDefault(); e.stopPropagation(); };
+        element.addEventListener('dragenter', prevent);
+        element.addEventListener('dragover', prevent);
+        element.addEventListener('drop', async (e) => {
+            prevent(e);
+            const dt = e.dataTransfer;
+            if (!dt) return;
+            const files = Array.from(dt.files || []);
+            if (!multiple && files.length > 1) files.length = 1;
+            for (const f of files) {
+                try {
+                    await this.handleFile(f);
+                } catch (err) {
+                    this.onStatusChange?.(`Drop error: ${err.message}`);
+                }
+            }
+        });
+    }
+
+    // Release a prepared resource (revokes object URLs, frees references)
+    releasePrepared(prepared) {
+        if (!prepared) return;
+        if (prepared.url && this._objectUrls && this._objectUrls.has(prepared.url)) {
+            URL.revokeObjectURL(prepared.url);
+            this._objectUrls.delete(prepared.url);
+        }
+        // If the converted blob was created by us and not the original file, allow GC
+        if (prepared.isConverted && prepared.blob) {
+            // no-op: dropping references is enough for GC; callers should drop their refs
+        }
+    }
+
+    // Cleanup all tracked object URLs
+    dispose() {
+        if (this._objectUrls) {
+            for (const u of this._objectUrls) {
+                try { URL.revokeObjectURL(u); } catch (e) { /* ignore */ }
+            }
+            this._objectUrls.clear();
+        }
     }
 
     async handleFile(file) {
