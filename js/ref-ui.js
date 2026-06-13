@@ -79,26 +79,35 @@ function restoreProject(p) {
     }, 100);
 }
 
-// TRANSFORM IMG (rotate/flip) 
+// TRANSFORM IMG (rotate/flip) - Center-anchored approach for reliable results
 window.transformImg = function(type) {
     if(!S.loaded || !S.img || !S.img.naturalWidth) return alert('Upload a photo first!');
     if(!canvas || !ctx) return;
     showLoader("Transforming...");
     setTimeout(() => {
         try {
-            const w = S.img.naturalWidth, h = S.img.naturalHeight;
+            const ow = S.img.naturalWidth, oh = S.img.naturalHeight;
             const tc = document.createElement('canvas');
-            if(type === 'rotL' || type === 'rotR') { tc.width = h; tc.height = w; } else { tc.width = w; tc.height = h; }
+            // For rotation, swap dimensions; for flip, keep same
+            tc.width = (type === 'rotL' || type === 'rotR') ? oh : ow;
+            tc.height = (type === 'rotL' || type === 'rotR') ? ow : oh;
             const tctx = tc.getContext('2d');
+            
+            // Fill with transparent, then draw image centered with transform
+            tctx.fillStyle = 'rgba(0,0,0,0)';
+            tctx.fillRect(0, 0, tc.width, tc.height);
+            
             tctx.save();
-            if(type === 'rotL') { tctx.translate(0, tc.width); tctx.rotate(-Math.PI/2); }
-            if(type === 'rotR') { tctx.translate(tc.height, 0); tctx.rotate(Math.PI/2); }
-            if(type === 'flipH') { tctx.translate(tc.width, 0); tctx.scale(-1, 1); }
-            if(type === 'flipV') { tctx.translate(0, tc.height); tctx.scale(1, -1); }
-            tctx.drawImage(S.img, 0, 0);
+            // Move to center of canvas, apply transform, draw image centered
+            tctx.translate(tc.width / 2, tc.height / 2);
+            if(type === 'rotL') tctx.rotate(-Math.PI / 2);
+            else if(type === 'rotR') tctx.rotate(Math.PI / 2);
+            else if(type === 'flipH') tctx.scale(-1, 1);
+            else if(type === 'flipV') tctx.scale(1, -1);
+            // Draw image centered around (0,0) after transform
+            tctx.drawImage(S.img, -ow / 2, -oh / 2, ow, oh);
             tctx.restore();
             
-            // Create a fresh image for the result
             const result = new Image();
             result.onload = function() {
                 S.img = result;
@@ -111,7 +120,7 @@ window.transformImg = function(type) {
                 hideLoader();
             };
             result.onerror = function() { hideLoader(); alert('Transform failed'); };
-            result.src = tc.toDataURL('image/png'); // Use PNG to avoid EXIF corruption
+            result.src = tc.toDataURL('image/png');
         } catch(e) { hideLoader(); alert('Transform error: ' + e.message); }
     }, 50);
 };
